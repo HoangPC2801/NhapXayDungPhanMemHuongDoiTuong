@@ -34,9 +34,9 @@ DateTime _parseDate(dynamic date) {
 class CartItem {
   final int productId;
   final String productName;
-  final int unitId;
-  final String unitName;
-  final double price;
+  int unitId;       
+  String unitName; 
+  double price;
   int quantity;
   double maxStock;
 
@@ -296,13 +296,17 @@ class User {
   @JsonKey(readValue: _readCaseInsensitive)
   final String storeId;
 
+  @JsonKey(readValue: _readCaseInsensitive, defaultValue: 'False')
+  final String allowAI; // 👈 Thêm quyền AI
+
   User({
-    required this.id,
-    required this.email,
-    required this.fullName,
-    required this.role,
-    required this.storeId,
-  });
+  required this.id,
+  required this.email,
+  required this.fullName,
+  required this.role,
+  required this.storeId,
+  this.allowAI = 'False', // ✅ thêm dòng này
+});
 
   static Object? _readCaseInsensitive(Map map, String key) {
     if (map.containsKey(key)) return map[key]?.toString() ?? '';

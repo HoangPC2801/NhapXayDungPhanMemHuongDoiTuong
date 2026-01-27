@@ -1,19 +1,15 @@
 import 'package:flutter/material.dart';
-import 'package:flutter_riverpod/flutter_riverpod.dart'; // [MỚI] Riverpod
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
 
-// [MỚI] Import Controller & Models
 import 'features/cart/cart_controller.dart';
 import 'models.dart';
 import 'checkout_screen.dart';
+import 'package:bizflow_mobile/providers/auth_provider.dart'; // 👈 Thêm import này
 
-// 1. Chuyển thành ConsumerWidget để lắng nghe Riverpod
 class CartScreen extends ConsumerWidget {
   const CartScreen({super.key});
 
-  static const String currentStoreId = "3fa85f64-5717-4562-b3fc-2c963f66afa6";
-
-  // Hàm hiển thị Dialog nhập số lượng thủ công
   void _showQuantityDialog(BuildContext context, WidgetRef ref, CartItem item) {
     final controller = TextEditingController(text: item.quantity.toString());
 
@@ -39,7 +35,6 @@ class CartScreen extends ConsumerWidget {
             onPressed: () {
               final newQty = int.tryParse(controller.text);
               if (newQty != null) {
-                // [LOGIC MỚI] Gọi Controller update
                 final error = ref
                     .read(cartControllerProvider.notifier)
                     .updateQuantity(item.productId, item.unitId, newQty);
@@ -65,18 +60,20 @@ class CartScreen extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    // 2. Lắng nghe State từ CartController
     final cartState = ref.watch(cartControllerProvider);
     final cartItems = cartState.items;
-    final totalAmount = cartState.totalAmount; // Tự động tính lại khi item đổi
+    final totalAmount = cartState.totalAmount;
 
     final currencyFormat = NumberFormat.currency(locale: 'vi_VN', symbol: '₫');
+
+    // [ĐỒNG BỘ MÀU] Lấy màu từ Theme chung (main.dart)
+    final colorScheme = Theme.of(context).colorScheme;
 
     return Scaffold(
       appBar: AppBar(
         title: const Text("Giỏ hàng"),
-        backgroundColor: Colors.blue[800],
-        foregroundColor: Colors.white,
+        // [ĐỒNG BỘ MÀU] Xóa backgroundColor cứng (Colors.blue[800]),
+        // nó sẽ tự nhận màu Orange[800] từ main.dart
       ),
       body: cartItems.isEmpty
           ? _buildEmptyCart()
@@ -89,17 +86,23 @@ class CartScreen extends ConsumerWidget {
                     separatorBuilder: (_, __) => const SizedBox(height: 12),
                     itemBuilder: (ctx, i) {
                       final item = cartItems[i];
-                      return _buildCartItem(context, ref, item, currencyFormat);
+                      // Truyền colorScheme xuống
+                      return _buildCartItem(
+                        context,
+                        ref,
+                        item,
+                        currencyFormat,
+                        colorScheme,
+                      );
                     },
                   ),
                 ),
-                _buildFooter(context, totalAmount, currencyFormat),
+                _buildFooter(context, ref, totalAmount, currencyFormat, colorScheme),
               ],
             ),
     );
   }
 
-  // Widget hiển thị khi giỏ hàng trống
   Widget _buildEmptyCart() {
     return const Center(
       child: Column(
@@ -116,12 +119,12 @@ class CartScreen extends ConsumerWidget {
     );
   }
 
-  // Widget hiển thị từng món hàng (Tách ra cho gọn)
   Widget _buildCartItem(
     BuildContext context,
     WidgetRef ref,
     CartItem item,
     NumberFormat fmt,
+    ColorScheme colorScheme, // [MỚI] Nhận colorScheme
   ) {
     return Card(
       elevation: 2,
@@ -149,7 +152,6 @@ class CartScreen extends ConsumerWidget {
                 IconButton(
                   icon: const Icon(Icons.delete_outline, color: Colors.red),
                   onPressed: () {
-                    // [LOGIC MỚI] Gọi remove từ Controller
                     ref
                         .read(cartControllerProvider.notifier)
                         .removeItem(item.productId, item.unitId);
@@ -158,7 +160,7 @@ class CartScreen extends ConsumerWidget {
               ],
             ),
 
-            // Hàng 2: Giá & Tồn kho (Real-time badge)
+            // Hàng 2: Giá & Tồn kho
             Row(
               children: [
                 Text(
@@ -166,13 +168,14 @@ class CartScreen extends ConsumerWidget {
                   style: TextStyle(color: Colors.grey[700], fontSize: 14),
                 ),
                 const SizedBox(width: 12),
-                // Badge hiển thị tồn kho
                 Container(
                   padding: const EdgeInsets.symmetric(
                     horizontal: 8,
                     vertical: 4,
                   ),
                   decoration: BoxDecoration(
+                    // Có thể giữ màu cam cho Badge cảnh báo kho,
+                    // hoặc đổi theo colorScheme.secondaryContainer nếu muốn
                     color: Colors.orange.shade50,
                     borderRadius: BorderRadius.circular(6),
                     border: Border.all(color: Colors.orange.shade200),
@@ -256,9 +259,10 @@ class CartScreen extends ConsumerWidget {
                 ),
                 Text(
                   fmt.format(item.total),
-                  style: const TextStyle(
+                  style: TextStyle(
                     fontWeight: FontWeight.bold,
-                    color: Colors.blue,
+                    // [ĐỒNG BỘ MÀU] Đổi Colors.blue -> colorScheme.primary
+                    color: colorScheme.primary,
                     fontSize: 18,
                   ),
                 ),
@@ -270,11 +274,12 @@ class CartScreen extends ConsumerWidget {
     );
   }
 
-  // Widget Footer hiển thị tổng tiền & nút thanh toán
   Widget _buildFooter(
     BuildContext context,
+    WidgetRef ref, // 👈 Thêm tham số ref
     double totalAmount,
     NumberFormat fmt,
+    ColorScheme colorScheme, // [MỚI] Nhận colorScheme
   ) {
     return Container(
       padding: const EdgeInsets.all(20),
@@ -302,10 +307,12 @@ class CartScreen extends ConsumerWidget {
                 ),
                 Text(
                   fmt.format(totalAmount),
-                  style: const TextStyle(
+                  style: TextStyle(
                     fontSize: 22,
                     fontWeight: FontWeight.bold,
-                    color: Colors.red,
+                    // [ĐỒNG BỘ MÀU] Dùng màu Primary thay vì Red để đồng bộ app
+                    // Hoặc giữ Red nếu muốn nhấn mạnh số tiền phải trả
+                    color: colorScheme.primary,
                   ),
                 ),
               ],
@@ -316,18 +323,31 @@ class CartScreen extends ConsumerWidget {
               height: 50,
               child: ElevatedButton(
                 onPressed: () {
+                  // 1. Lấy StoreId từ AuthProvider
+                  final authState = ref.read(authNotifierProvider);
+                  final storeId = authState.currentUser?.storeId ?? "";
+
+                  if (storeId.isEmpty) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(content: Text("Lỗi: Không tìm thấy mã cửa hàng. Vui lòng đăng nhập lại.")),
+                    );
+                    return;
+                  }
+
                   Navigator.push(
                     context,
                     MaterialPageRoute(
-                      builder: (_) => const CheckoutScreen(
-                        storeId: CartScreen.currentStoreId,
+                      builder: (_) => CheckoutScreen(
+                        storeId: storeId,
                       ),
                     ),
                   );
                 },
                 style: ElevatedButton.styleFrom(
-                  backgroundColor: Colors.blue[800],
-                  foregroundColor: Colors.white,
+                  // [ĐỒNG BỘ MÀU]
+                  // Xóa backgroundColor cứng.
+                  // Main.dart đã set elevatedButtonTheme backgroundColor = primaryDark
+                  // Nếu muốn chắc chắn: backgroundColor: colorScheme.primary,
                   shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(10),
                   ),
